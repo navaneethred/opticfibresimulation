@@ -169,7 +169,7 @@ def save_graph():
 
 # --- Create the GUI ---
 root = tk.Tk()
-root.title("Optical Fiber Simulation App")
+root.title("G.A.M.B.L.E. Fiber Loss Simulator")
 
 # Input frame
 input_frame = ttk.Frame(root, padding="10")

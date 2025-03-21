@@ -333,7 +333,7 @@ def update_font_size(event):
 
 # --- Create the main GUI window and layout ---
 root = tk.Tk()
-root.title("Optical Fiber Simulation App")
+root.title("G.A.M.B.L.E. Fiber Loss Simulator")
 
 # Bind the <Configure> event to update font size responsively.
 root.bind("<Configure>", update_font_size)

@@ -296,7 +296,7 @@ def save_entire_graph():
 
 # --- Create the GUI ---
 root = tk.Tk()
-root.title("Optical Fiber Simulation App")
+root.title("G.A.M.B.L.E. Fiber Loss Simulator")
 
 # Create input frame
 input_frame = ttk.Frame(root, padding="10")

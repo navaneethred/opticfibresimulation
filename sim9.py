@@ -326,7 +326,7 @@ def save_entire_graph():
 
 # --- Create the main GUI window and layout ---
 root = tk.Tk()
-root.title("Optical Fiber Simulation App")
+root.title("G.A.M.B.L.E. Fiber Loss Simulator")
 
 # Configure responsiveness
 root.columnconfigure(0, weight=1)

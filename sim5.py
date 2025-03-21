@@ -98,7 +98,7 @@ def run_simulation():
 
 # --- Create the GUI ---
 root = tk.Tk()
-root.title("Optical Fiber Simulation")
+root.title("G.A.M.B.L.E. Fiber Loss Simulator")
 
 # Create a frame for inputs
 input_frame = ttk.Frame(root, padding="10")
