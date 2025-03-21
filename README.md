@@ -17,7 +17,7 @@ G.A.M.B.L.E. is a **fiber optics simulation tool** designed to estimate **bendin
 To run G.A.M.B.L.E., you need Python **3.8+** and the following dependencies:
 
 ```bash
-pip install numpy matplotlib tkinter
+pip install numpy matplotlib tk
 ```
 
 Then, simply clone the repo:
