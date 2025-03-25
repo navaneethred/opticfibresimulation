@@ -6,63 +6,116 @@ from tkinter import ttk, filedialog
 import tkinter.font as tkFont
 
 # --- Define fiber type parameters (5 fiber types) ---
+# Added core_radius (a in meters), n1, n2, and wavelength (λ in meters)
 fiber_types = {
     "G.652D": {
-        "attenuation_coeff": 0.20,
-        "base_bending_loss": 0.10,
-        "ideal_bend_radius": 5.0,
-        "description": "Standard Single Mode Fiber (ITU-T G.652D) with typical attenuation 0.20 dB/km at 1550 nm."
+        "attenuation_coeff": 0.20,  # dB/km
+        "description": "Standard Single Mode Fiber (ITU-T G.652D) with typical attenuation 0.20 dB/km at 1550 nm.",
+        "core_radius": 4.1e-6,        # 4.1 µm in meters
+        "n1": 1.4682,
+        "n2": 1.462,
+        "wavelength": 1550e-9       # 1550 nm in meters
     },
     "G.657A": {
-        "attenuation_coeff": 0.18,
-        "base_bending_loss": 0.05,
-        "ideal_bend_radius": 3.0,
-        "description": "Bend Insensitive Fiber (ITU-T G.657A) with improved bending loss and lower attenuation."
+        "attenuation_coeff": 0.18,  # dB/km
+        "description": "Bend Insensitive Fiber (ITU-T G.657A) with improved bending performance and lower attenuation.",
+        "core_radius": 4.1e-6,
+        "n1": 1.4682,
+        "n2": 1.462,
+        "wavelength": 1550e-9
     },
     "G.655": {
-        "attenuation_coeff": 0.22,
-        "base_bending_loss": 0.15,
-        "ideal_bend_radius": 5.0,
-        "description": "Non-Zero Dispersion-Shifted Fiber (ITU-T G.655) with slightly higher attenuation."
+        "attenuation_coeff": 0.22,  # dB/km
+        "description": "Non-Zero Dispersion-Shifted Fiber (ITU-T G.655) with slightly higher attenuation and a modestly adjusted cladding index.",
+        "core_radius": 4.1e-6,
+        "n1": 1.4682,
+        "n2": 1.455,                # Slightly lower cladding index for dispersion-shifted design
+        "wavelength": 1550e-9
     },
     "G.652C": {
-        "attenuation_coeff": 0.22,
-        "base_bending_loss": 0.12,
-        "ideal_bend_radius": 5.0,
-        "description": "Legacy Standard Single Mode Fiber (ITU-T G.652C) with slightly higher loss and bending sensitivity."
+        "attenuation_coeff": 0.22,  # dB/km
+        "description": "Legacy Standard Single Mode Fiber (ITU-T G.652C) with higher loss and bending sensitivity.",
+        "core_radius": 4.1e-6,
+        "n1": 1.4682,
+        "n2": 1.462,
+        "wavelength": 1550e-9
     },
     "G.657B": {
-        "attenuation_coeff": 0.18,
-        "base_bending_loss": 0.03,
-        "ideal_bend_radius": 2.5,
-        "description": "Ultra Bend Insensitive Fiber (ITU-T G.657B) with extremely low bending loss."
+        "attenuation_coeff": 0.18,  # dB/km
+        "description": "Ultra Bend Insensitive Fiber (ITU-T G.657B) offering extremely low bending loss with a marginally reduced cladding index.",
+        "core_radius": 4.1e-6,
+        "n1": 1.4682,
+        "n2": 1.460,                # Slightly lower cladding index for enhanced bending performance
+        "wavelength": 1550e-9
+    },
+    "OM1": {
+        "attenuation_coeff": 3.0,   # dB/km
+        "description": "Multimode Fiber OM1 (62.5/125 µm) optimized for 850 nm operation.",
+        "core_radius": 31.25e-6,      # 62.5 µm diameter -> radius = 31.25 µm in meters
+        "n1": 1.50,
+        "n2": 1.46,
+        "wavelength": 850e-9        # 850 nm in meters
+    },
+    "OM3": {
+        "attenuation_coeff": 3.5,   # dB/km
+        "description": "Multimode Fiber OM3 (50/125 µm) designed for high-speed 10 Gb/s data transmission at 850 nm.",
+        "core_radius": 25e-6,         # 50 µm diameter -> radius = 25 µm in meters
+        "n1": 1.48,
+        "n2": 1.46,
+        "wavelength": 850e-9
+    },
+    "OM4": {
+        "attenuation_coeff": 3.5,   # dB/km
+        "description": "Multimode Fiber OM4 with improved bandwidth for high-speed data centers at 850 nm.",
+        "core_radius": 25e-6,         # Similar core size to OM3
+        "n1": 1.48,
+        "n2": 1.46,
+        "wavelength": 850e-9
     }
 }
 
 # Global simulation constants
 I_in = 1000.0         # (Reference) Input current in µA (not used directly now)
 default_turns = 5     # Default number of turns
-bend_angle = 90.0     # Bend angle in degrees
+bend_angle = 90.0     # Bend angle in degrees (not used in new bending loss model)
 room_temperature = 25.0   # Reference temperature (°C)
 temp_coefficient = 0.0000 # Temperature loss coefficient (dB/km/°C)
-noise_std = 0.01          # Noise standard deviation (fraction)
+noise_std = 0.00          # Noise standard deviation (fraction)
 
 # Global storage for simulation data (for saving individual graphs)
 length_sim_data = None
 bending_sim_data = None
 turns_sim_data = None
 
-def bending_loss(baseline, ideal, bend_radius, bend_angle_deg):
-    return baseline * (ideal / bend_radius) * (bend_angle_deg / 90.0)
+def bending_loss(core_radius, n1, n2, wavelength, bend_radius_cm):
+    """
+    Calculate bending loss using the standard model:
+    
+    α_b = 1/2 * (π a n1 / λ)^2 * exp[ - (4/3) * (R / a) * (n1^2 - n2^2)^(3/2) ]
+    
+    Parameters:
+      core_radius: core radius (a) in meters
+      n1, n2: refractive indices of the core and cladding
+      wavelength: operating wavelength (λ) in meters
+      bend_radius_cm: bending radius (R) provided in centimeters
+      
+    Returns:
+      Bending loss per bend.
+    """
+    # Convert bend radius from cm to m
+    R_m = bend_radius_cm * 0.01
+    factor = (np.pi * core_radius * n1 / wavelength)**2
+    loss = 0.5 * factor * np.exp(- (4/3) * (R_m / core_radius) * ( (n1**2 - n2**2) ** (3/2) ))
+    return loss
 
-def simulate_total_loss(fiber_length, bend_radius, ambient_temp,
-                        attenuation_coeff, base_bending_loss, ideal_bend_radius, n_turns=default_turns):
+def simulate_total_loss(fiber_length, bend_radius_cm, ambient_temp,
+                        attenuation_coeff, core_radius, n1, n2, wavelength, n_turns=default_turns):
     # Attenuation loss (dB)
     loss_attenuation = attenuation_coeff * fiber_length
     # Temperature-induced loss (dB)
     loss_temp = temp_coefficient * abs(ambient_temp - room_temperature) * fiber_length
-    # Bending loss: loss per bend * number of turns
-    loss_per_bend = bending_loss(base_bending_loss, ideal_bend_radius, bend_radius, bend_angle)
+    # Bending loss: calculate loss per bend using the new equation and multiply by number of turns
+    loss_per_bend = bending_loss(core_radius, n1, n2, wavelength, bend_radius_cm)
     total_bending_loss = n_turns * loss_per_bend
     total_loss = loss_attenuation + total_bending_loss + loss_temp
     # Add random noise to simulate measurement variability
@@ -90,21 +143,23 @@ def run_length_simulation():
         result_label.config(text="Enter a valid ambient temperature (°C).")
         return
     try:
-        bend_radius = float(bend_entry.get())
+        bend_radius_cm = float(bend_entry.get())
     except ValueError:
         result_label.config(text="Enter a valid bending radius (cm) for length sim.")
         return
 
     params = fiber_types[fiber_type]
     att_coeff = params["attenuation_coeff"]
-    base_bend_loss = params["base_bending_loss"]
-    ideal_bend_rad = params["ideal_bend_radius"]
+    core_radius = params["core_radius"]
+    n1 = params["n1"]
+    n2 = params["n2"]
+    wavelength = params["wavelength"]
 
     fiber_lengths = np.linspace(length_start, length_end, 100)
     loss_values = []
     for L in fiber_lengths:
-        loss = simulate_total_loss(L, bend_radius, ambient_temp,
-                                   att_coeff, base_bend_loss, ideal_bend_rad)
+        loss = simulate_total_loss(L, bend_radius_cm, ambient_temp,
+                                   att_coeff, core_radius, n1, n2, wavelength)
         loss_values.append(loss)
 
     length_sim_data = (fiber_lengths, loss_values)
@@ -142,14 +197,16 @@ def run_bending_simulation():
 
     params = fiber_types[fiber_type]
     att_coeff = params["attenuation_coeff"]
-    base_bend_loss = params["base_bending_loss"]
-    ideal_bend_rad = params["ideal_bend_radius"]
+    core_radius = params["core_radius"]
+    n1 = params["n1"]
+    n2 = params["n2"]
+    wavelength = params["wavelength"]
 
     bend_radii = np.linspace(bend_from, bend_to, 100)
     loss_values = []
     for R in bend_radii:
         loss = simulate_total_loss(fixed_length, R, ambient_temp,
-                                   att_coeff, base_bend_loss, ideal_bend_rad)
+                                   att_coeff, core_radius, n1, n2, wavelength)
         loss_values.append(loss)
 
     bending_sim_data = (bend_radii, loss_values)
@@ -180,7 +237,7 @@ def run_turns_simulation():
         result_label.config(text="Enter valid turn range values (integer).")
         return
     try:
-        bend_radius = float(bend_turns_entry.get())
+        bend_radius_cm = float(bend_turns_entry.get())
     except ValueError:
         result_label.config(text="Enter a valid bending radius (cm) for turns sim.")
         return
@@ -192,14 +249,16 @@ def run_turns_simulation():
 
     params = fiber_types[fiber_type]
     att_coeff = params["attenuation_coeff"]
-    base_bend_loss = params["base_bending_loss"]
-    ideal_bend_rad = params["ideal_bend_radius"]
+    core_radius = params["core_radius"]
+    n1 = params["n1"]
+    n2 = params["n2"]
+    wavelength = params["wavelength"]
 
     n_turns_array = np.arange(turn_from, turn_to + 1)
     loss_values = []
     for n in n_turns_array:
-        loss = simulate_total_loss(fixed_length, bend_radius, ambient_temp,
-                                   att_coeff, base_bend_loss, ideal_bend_rad, n_turns=n)
+        loss = simulate_total_loss(fixed_length, bend_radius_cm, ambient_temp,
+                                   att_coeff, core_radius, n1, n2, wavelength, n_turns=n)
         loss_values.append(loss)
 
     turns_sim_data = (n_turns_array, loss_values)
@@ -360,7 +419,7 @@ temp_entry = ttk.Entry(input_frame, width=5)
 temp_entry.insert(0, "30")
 temp_entry.grid(row=3, column=1, sticky="W")
 
-# Bending radius for length simulation
+# Bending radius for length simulation (in cm)
 ttk.Label(input_frame, text="Bending Radius (cm) [Length Sim]:").grid(row=4, column=0, sticky="W")
 bend_entry = ttk.Entry(input_frame, width=5)
 bend_entry.insert(0, "3")
